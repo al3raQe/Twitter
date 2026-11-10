@@ -85,11 +85,13 @@ if [[ ! -f "$OPENSSL_PREFIX/lib/libssl.a" ]]; then
 
     export IPHONEOS_DEPLOYMENT_TARGET=15.0
 
-    ./Configure ios64-xcrun \
+    OPENSSL_TARGET=ios64-xcrun
+    if [[ "$IOS_ARCH" == arm64e ]]; then OPENSSL_TARGET=ios64e-xcrun; fi
+    ./Configure "$OPENSSL_TARGET" \
         no-shared \
         no-tests \
         --prefix="$OPENSSL_PREFIX" \
-        -mios-version-min=15.0 -arch "$IOS_ARCH"
+        -mios-version-min=15.0
 
     make -j"$JOBS"
     make install_sw

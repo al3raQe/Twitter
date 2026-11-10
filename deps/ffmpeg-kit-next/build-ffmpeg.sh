@@ -11,13 +11,15 @@ set -Eeuo pipefail
 # (scripts/source.sh in the submodule).
 
 MIN_IOS=15.0
+IOS_ARCH="${IOS_ARCH:-arm64}"
+case "$IOS_ARCH" in arm64|arm64e) ;; *) echo "Unsupported IOS_ARCH: $IOS_ARCH" >&2; exit 1 ;; esac
 
 FFMPEG_TAG=n8.1.2
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KIT_SRC="$KIT_DIR/upstream/apple/src"
 OUT_DIR="$KIT_DIR/build"
-BUILD="${BUILD_DIR:-/tmp/nfb-ffmpeg-build}"
+BUILD="${BUILD_DIR:-/tmp/nfb-ffmpeg-build-$IOS_ARCH}"
 
 if [[ "$(uname)" == "Darwin" ]]; then
     JOBS="$(sysctl -n hw.ncpu)"
@@ -57,11 +59,11 @@ mkdir -p "$BUILD/bin"
 # Wrapper compilers so build systems that mangle multi-word CC still work.
 cat > "$BUILD/bin/ios-clang" <<EOF
 #!/usr/bin/env bash
-exec "$CC_BIN" -target arm64-apple-ios$MIN_IOS -isysroot "$SDK" -miphoneos-version-min=$MIN_IOS "\$@"
+exec "$CC_BIN" -target $IOS_ARCH-apple-ios$MIN_IOS -isysroot "$SDK" -miphoneos-version-min=$MIN_IOS "\$@"
 EOF
 cat > "$BUILD/bin/ios-clang++" <<EOF
 #!/usr/bin/env bash
-exec "$CXX_BIN" -target arm64-apple-ios$MIN_IOS -isysroot "$SDK" -miphoneos-version-min=$MIN_IOS "\$@"
+exec "$CXX_BIN" -target $IOS_ARCH-apple-ios$MIN_IOS -isysroot "$SDK" -miphoneos-version-min=$MIN_IOS "\$@"
 EOF
 chmod +x "$BUILD/bin/ios-clang" "$BUILD/bin/ios-clang++"
 
@@ -87,7 +89,7 @@ if [[ ! -f "$OPENSSL_PREFIX/lib/libssl.a" ]]; then
         no-shared \
         no-tests \
         --prefix="$OPENSSL_PREFIX" \
-        -mios-version-min=15.0
+        -mios-version-min=15.0 -arch "$IOS_ARCH"
 
     make -j"$JOBS"
     make install_sw

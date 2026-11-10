@@ -1,0 +1,80 @@
+name: Universal jailbreak packages
+on:
+  push:
+    branches: [codex/deb-and-reusable-ipa]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      THEOS: ${{ github.workspace }}/theos
+      BUILD_DIR: ${{ github.workspace }}/ffmpeg-build
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: main
+          submodules: recursive
+      - run: brew install make dpkg ldid
+      - run: echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@v6
+        with:
+          repository: theos/theos
+          path: theos
+          submodules: recursive
+      - uses: actions/cache@v6
+        id: sdk
+        with:
+          path: theos/sdks
+          key: iOS-16.5-SDK
+      - if: steps.sdk.outputs.cache-hit != 'true'
+        run: |
+          git clone -n --depth=1 --filter=tree:0 https://github.com/theos/sdks/
+          cd sdks
+          git sparse-checkout set --no-cone iPhoneOS16.5.sdk
+          git checkout
+          mkdir -p "$THEOS/sdks"
+          cp -R iPhoneOS16.5.sdk "$THEOS/sdks/"
+      - uses: actions/cache@v6
+        with:
+          path: ffmpeg-build
+          key: universal-media-v1-${{ runner.os }}-${{ hashFiles('main/deps/ffmpeg-kit-next/build-ffmpeg.sh') }}
+      - name: Build media dependencies for both architectures
+        working-directory: main
+        run: |
+          for arch in arm64 arm64e; do
+            IOS_ARCH="$arch" BUILD_DIR="$BUILD_DIR/$arch" ./deps/ffmpeg-kit-next/build-ffmpeg.sh
+            mkdir -p "../media-$arch"
+            cp deps/ffmpeg-kit-next/build/lib/*.a "../media-$arch/"
+            for lib in "../media-$arch/"*.a; do xcrun lipo -verify_arch "$arch" "$lib"; done
+          done
+          for lib in ../media-arm64/*.a; do
+            name=$(basename "$lib")
+            xcrun lipo -create "$lib" "../media-arm64e/$name" -output "deps/ffmpeg-kit-next/build/lib/$name"
+          done
+      - name: Build and inspect rootful and rootless DEBs
+        working-directory: main
+        run: |
+          mkdir -p ../deliverables
+          for scheme in rootful rootless; do
+            if [ "$scheme" = rootful ]; then export THEOS_PACKAGE_SCHEME=""; else export THEOS_PACKAGE_SCHEME=rootless; fi
+            make clean
+            make package ARCHS="arm64 arm64e" FINALPACKAGE=1
+            for lib in .theos/obj/BHTwitter.dylib .theos/obj/libbhFLEX.dylib; do
+              xcrun lipo -verify_arch arm64 arm64e "$lib"
+              xcrun lipo -info "$lib"
+            done
+            for deb in packages/*.deb; do
+              dpkg-deb --info "$deb"
+              cp "$deb" ../deliverables/
+            done
+          done
+          git rev-parse HEAD > ../deliverables/commit.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: universal-debs
+          path: deliverables/
+          retention-days: 14
+          if-no-files-found: error

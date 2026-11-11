@@ -196,7 +196,7 @@
 "DOWNLOAD_HIGHEST_QUALITY_TITLE" = "Завантажувати в повній якості";
 "DOWNLOAD_HIGHEST_QUALITY_DETAIL" = "Пропускає вибір якості та зберігає найкращий MP4.";
 
-"DISABLE_VIDEO_DOCKING_TITLE"" = "Не закріпляти відео";
+"DISABLE_VIDEO_DOCKING_TITLE" = "Не закріпляти відео";
 "DISABLE_VIDEO_DOCKING_DETAIL" = "Приховує кнопку режиму картинка-в-картинці під час свайпу по відео.";
 
 "TAP_TO_PAUSE_TITLE" = "Тапнути для паузи";
